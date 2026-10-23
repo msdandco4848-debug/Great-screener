@@ -1,4 +1,67 @@
+import streamlit as st
+import pandas as pd
+import yfinance as yf
+from datetime import datetime
 
-streamlit
-pandas
-yfinance
+st.set_page_config(page_title="Great Screen", page_icon="📈", layout="wide")
+
+st.title("📈 GREAT SCREEN")
+st.subheader("Indian Stock Market Screener")
+st.caption("Stock price data may be delayed. For research only.")
+
+symbols_input = st.text_input(
+    "NSE Stock Symbols",
+    value="RELIANCE, TCS, INFY"
+)
+
+if st.button("Get Stock Prices"):
+    symbols = [s.strip().upper() for s in symbols_input.split(",") if s.strip()]
+
+    results = []
+
+    with st.spinner("Fetching stock prices..."):
+        for symbol in symbols:
+            try:
+                ticker = yf.Ticker(symbol + ".NS")
+                history = ticker.history(period="5d", interval="1d")
+
+                if history.empty:
+                    st.warning(f"No price data found for {symbol}")
+                    continue
+
+                close = history["Close"].dropna()
+
+                if close.empty:
+                    st.warning(f"No closing price for {symbol}")
+                    continue
+
+                price = float(close.iloc[-1])
+                previous = float(close.iloc[-2]) if len(close) > 1 else price
+                change = ((price - previous) / previous * 100) if previous else 0
+
+                results.append({
+                    "Symbol": symbol,
+                    "Price (₹)": round(price, 2),
+                    "Daily Change (%)": round(change, 2),
+                    "Data Date": str(close.index[-1].date())
+                })
+
+            except Exception as error:
+                st.warning(f"{symbol}: Could not fetch data. {error}")
+
+    if results:
+        df = pd.DataFrame(results)
+        st.dataframe(df, use_container_width=True, hide_index=True)
+
+        st.download_button(
+            "Download CSV",
+            data=df.to_csv(index=False).encode("utf-8-sig"),
+            file_name="great_screen_prices.csv",
+            mime="text/csv"
+        )
+    else:
+        st.error("No stock prices received. Try again later.")
+
+st.divider()
+st.caption("Great Screen | Data source: Yahoo Finance")
+
